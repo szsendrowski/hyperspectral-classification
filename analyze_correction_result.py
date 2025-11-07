@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import spectral.io.envi as envi
 
 
-scene_dir = r"C:\Users\sciezka\do\folderu\ang20160917t203013_rfl_SIMPLE"
-hdr_name = "ang20160917t203013_rdn_v1n2_img_bsq_rfl_simple.hdr"
+scene_dir = r"C:\Users\sciezka\do\folderu\ang20160917t203013_rfl"
+hdr_name = "ang20160917t203013_rdn_v1n2_img_bsq_rfl.hdr"
 bands_to_check = [30, 100, 150]  # przykładowe pasma
 
 

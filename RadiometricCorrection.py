@@ -121,7 +121,7 @@ def run_atm_corr(scene_dir,
 
     # Zapis
     base_name = os.path.splitext(os.path.basename(in_img_path))[0]
-    tmp_rfl_path = os.path.join(out_dir, f"{base_name}_rfl_simple.bsq")
+    tmp_rfl_path = os.path.join(out_dir, f"{base_name}_rfl.bsq")
 
     total_bands = len(valid_idx)
     block_size = 64
