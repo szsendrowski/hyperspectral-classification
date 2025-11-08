@@ -2,7 +2,6 @@ import os
 import json
 from time import time
 from collections import Counter
-
 import geopandas as gpd
 import numpy as np
 import rasterio
@@ -10,11 +9,7 @@ import torch
 from affine import Affine
 from rasterio.crs import CRS
 from rasterio.features import rasterize
-from sklearn.metrics import (
-    accuracy_score,
-    classification_report,
-    confusion_matrix,
-)
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -45,7 +40,7 @@ class _MLP(nn.Module):
             hidden_sizes = list(hidden_layer_sizes)
 
         activation_map = {
-            "relu": nn.ReLU,
+            "relu": nn.ReLU,        # Funkcje aktywacji
             "tanh": nn.Tanh,
             "elu": nn.ELU,
             "gelu": nn.GELU,
@@ -69,7 +64,7 @@ class _MLP(nn.Module):
     def forward(self, x):
         return self.network(x)
 
-
+# Wczytywanie pliku PCA z georeferencja
 def _load_pca_memmap(pca_dir: str):
     dat_files = [f for f in os.listdir(pca_dir) if f.startswith("Xpca_") and f.endswith(".dat")]
     if not dat_files:
@@ -95,7 +90,7 @@ def _load_pca_memmap(pca_dir: str):
     Xpca = np.memmap(pca_path, dtype=np.float32, mode="r", shape=(n_pix, n_comp))
     return Xpca, n_pix, n_comp, rows, cols, transform, crs, pca_path
 
-
+# Trening
 def train_mlp_classifier(
     pca_dir: str,
     shp_path: str,
@@ -115,6 +110,7 @@ def train_mlp_classifier(
     print(f"[INFO] PCA: {n_pix} pikseli × {n_comp} komponentów; raster {rows}×{cols}")
     Xpca_img = Xpca.reshape(rows, cols, n_comp)
 
+    # Import dataset-a
     gdf = gpd.read_file(shp_path)
     if "label_id" not in gdf.columns:
         raise ValueError("Shapefile musi zawierać kolumnę 'label_id'.")
@@ -140,6 +136,7 @@ def train_mlp_classifier(
     else:
         print(gdf["label_id"].value_counts())
 
+    # Rasteryzacja etykiet
     print("[INFO] Rasteryzuję poligony do rastra etykiet...")
     shapes = [(geom, int(lbl)) for geom, lbl in zip(gdf.geometry, gdf["label_id"])]
     label_raster = rasterize(
@@ -196,7 +193,7 @@ def train_mlp_classifier(
 
     torch.manual_seed(seed)
     np.random.seed(seed)
-
+    # Parametry MLP
     hidden_layer_sizes = model_params.pop("hidden_layer_sizes", (128, 64))
     activation = model_params.pop("activation", "relu")
     dropout = model_params.pop("dropout", 0.2)
@@ -293,7 +290,7 @@ def train_mlp_classifier(
     epochs_without_improve = 0
     epochs_run = 0
 
-    # --- trening ---
+    # Trening
     for epoch in range(1, epochs + 1):
         model.train()
         running_loss = 0.0
@@ -343,7 +340,7 @@ def train_mlp_classifier(
             val_losses.append(val_loss)
             val_accuracies.append(val_acc)
 
-            # --- early stopping ---
+            # Early stopping
             if val_loss < best_metric:
                 best_metric = val_loss
                 best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
@@ -359,14 +356,14 @@ def train_mlp_classifier(
             best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
             best_epoch = epoch
 
-        # --- logowanie postępu ---
+        # Logowanie postępu
         if epoch % 10 == 0 or epoch == 1:
             log_msg = f"[EPOCH {epoch}] train_loss={train_loss:.4f}, train_acc={train_acc:.4f}"
             if val_loss is not None:
                 log_msg += f", val_loss={val_loss:.4f}, val_acc={val_acc:.4f}"
             print(log_msg)
 
-    # --- koniec treningu ---
+    # Koniec treningu
     if best_state is None:
         best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
         best_epoch = epochs_run
@@ -376,7 +373,7 @@ def train_mlp_classifier(
     model.eval()
     fit_s = time() - t0
 
-    # 🔹 Funkcja pomocnicza do predykcji
+    # Funkcja pomocnicza do predykcji
     def _predict_array(array: np.ndarray) -> np.ndarray:
         array_norm = (array - scaler_mean) / scaler_std
         dataset = TensorDataset(torch.from_numpy(array_norm.astype(np.float32)))
@@ -392,11 +389,11 @@ def train_mlp_classifier(
         preds_idx = np.concatenate(preds, axis=0)
         return labels_array[preds_idx]
 
-    # 🔹 Predykcje na zbiorze treningowym i testowym
+    # Predykcje na zbiorze treningowym i testowym
     ytr_pred = _predict_array(X_train_raw)
     yte_pred = _predict_array(X_test)
 
-    # --- Ewaluacja ---
+    # Ewaluacja
     metrics = {
         "name": "MLP",
         "params": training_config,
@@ -428,7 +425,7 @@ def train_mlp_classifier(
         },
     }
 
-    # --- Zapis modelu ---
+    # Zapis modelu
     artifact = {
         "state_dict": {k: v.cpu() for k, v in model.state_dict().items()},
         "scaler": {"mean": scaler_mean, "std": scaler_std},
@@ -446,7 +443,7 @@ def train_mlp_classifier(
     map_batch_size = 20000
     preds = np.zeros((rows * cols,), dtype=np.int32)
 
-    # Maska ważnych pikseli (jak w RF/kNN/SVM)
+    # Maska ważnych pikseli
     valid_mask = ~np.isnan(Xpca).any(axis=1)
     valid_mask &= ~(Xpca.sum(axis=1) == 0)
 
@@ -484,13 +481,12 @@ def train_mlp_classifier(
 
     preds_img = preds.reshape(rows, cols).astype("float32")
 
-    # Miejsca nieważne -> NaN (nie klasa 0)
     preds_img[~valid_mask.reshape(rows, cols)] = np.nan
 
-    # Usuń klasę 0 z metryk
+    # Usuwanie klasę 0 z metryk
     metrics["test"]["labels"] = [lbl for lbl in metrics["test"]["labels"] if lbl != 0]
 
-    # Ustaw nodata = 0 (dla poprawnej wizualizacji w QGIS)
+    # Ustawianie nodata = 0
     profile = {
         "driver": "GTiff",
         "height": rows,
