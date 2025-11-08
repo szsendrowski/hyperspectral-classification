@@ -131,7 +131,6 @@ def train_random_forest_spatial(
     print("[INFO] Trenuję RandomForest...")
     rf = RandomForestClassifier(
         n_jobs=-1,
-        class_weight="balanced",
         random_state=random_state,
         **model_params
     )

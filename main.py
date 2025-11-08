@@ -7,13 +7,14 @@ from preprocessing.Georeference import add_georeference_to_pca
 from classification.RandomForest import train_random_forest_spatial
 from classification.kNN import train_knn_classifier
 from classification.SVM import train_svm_spatial
+from classification.MLP import train_mlp_classifier
 from analyze.TrainingReport import save_training_report
 
 
 # Sciezka do glownego katalogu
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "data"))
 CLASSIFY_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "classification"))
-ANALYZE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "analysis"))
+ANALYZE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "analyze"))
 
 # NAZWA SCENY
 SCENE_NAME = "ang20160917t203013"
@@ -36,10 +37,12 @@ PCA_JSON = PCA_DAT + ".json"
 RF_MODEL = os.path.join(CLASSIFY_DIR, "models", "random_forest_model.joblib")
 KNN_MODEL = os.path.join(CLASSIFY_DIR, "models", "knn_model.joblib")
 SVM_MODEL = os.path.join(CLASSIFY_DIR, "models", "svm_model.joblib")
+MLP_MODEL = os.path.join(CLASSIFY_DIR, "models", "mlp_model.joblib")
 
 RF_MAP = os.path.join(CLASSIFY_DIR, "maps", "classification_map_RF.tif")
 KNN_MAP = os.path.join(CLASSIFY_DIR, "maps", "classification_map_kNN.tif")
 SVM_MAP = os.path.join(CLASSIFY_DIR, "maps", "classification_map_SVM.tif")
+MLP_MAP = os.path.join(CLASSIFY_DIR, "maps", "classification_map_MLP.tif")
 
 # Raport
 REPORT_PDF = os.path.join(ANALYZE_DIR, "training_report.pdf")
@@ -53,20 +56,37 @@ TEST_SIZE = 0.2
 # Parametry modeli
 MODEL_PARAMS = {
     "RandomForest": {
-        "n_estimators": 300,
-        "max_depth": 25,
-        "min_samples_split": 3,
+        "n_estimators": 500,
+        "max_depth": 15,
+        "min_samples_split": 5,
+        "min_samples_leaf": 2,
+        "max_features": "sqrt",
+        "class_weight": "balanced",
     },
     "kNN": {
-        "n_neighbors": 7,
+        "n_neighbors": 5,
         "weights": "distance",
-        "metric": "manhattan",
+        "metric": "minkowski",
+        "p": 2,
     },
+
     "SVM": {
         "kernel": "rbf",
         "C": 10.0,
         "gamma": "scale",
-    }
+    },
+    "MLP": {
+        "hidden_layer_sizes": (256, 128, 64),
+        "activation": "relu",
+        "dropout": 0.2,
+        "epochs": 150,
+        "batch_size": 512,
+        "learning_rate": 1e-3,
+        "weight_decay": 1e-4,
+        "early_stopping": True,
+        "validation_fraction": 0.1,
+        "patience": 20,
+    },
 }
 
 os.makedirs(OUT_RFL_DIR, exist_ok=True)
@@ -225,6 +245,34 @@ if __name__ == "__main__":
         )
     all_metrics.append(svm_metrics)
 
+    # MLP
+    print("\n=== Klasyfikacja gruntów (MLP) ===")
+    if os.path.exists(MLP_MODEL) and os.path.exists(MLP_MAP):
+        print("[INFO] Pomijam trenowanie — ewaluacja istniejącego modelu.")
+        _, mlp_metrics = train_mlp_classifier(
+            pca_dir=OUT_PCA_DIR,
+            shp_path=GROUND_TRUTH_SHP,
+            model_out=MLP_MODEL,
+            map_out=MLP_MAP,
+            reflectance_bsq_path=REFLECTANCE_BSQ,
+            skip_map=True,
+            max_samples_per_class=MAX_SAMPLES,
+            test_size=TEST_SIZE,
+            **MODEL_PARAMS["MLP"],
+        )
+    else:
+        mlp_model, mlp_metrics = train_mlp_classifier(
+            pca_dir=OUT_PCA_DIR,
+            shp_path=GROUND_TRUTH_SHP,
+            model_out=MLP_MODEL,
+            map_out=MLP_MAP,
+            reflectance_bsq_path=REFLECTANCE_BSQ,
+            max_samples_per_class=MAX_SAMPLES,
+            test_size=TEST_SIZE,
+            **MODEL_PARAMS["MLP"],
+        )
+    all_metrics.append(mlp_metrics)
+
     # Raport PDF
     with open(PCA_JSON, "r", encoding="utf-8") as f:
         pca_meta = json.load(f)
@@ -243,4 +291,4 @@ if __name__ == "__main__":
     save_training_report(REPORT_PDF, context, all_metrics)
     print(f"\n[DONE] Raport PDF zapisany: {REPORT_PDF}")
 
-    print("\n=== [DONE] Pipeline ukończony (korekcja + PCA + RF + kNN + SVM + RAPORT) ===")
+    print("\n=== [DONE] Pipeline ukończony (korekcja + PCA + RF + kNN + SVM + MLP+ RAPORT) ===")
