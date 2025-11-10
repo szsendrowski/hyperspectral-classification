@@ -56,18 +56,17 @@ TEST_SIZE = 0.2
 # Parametry modeli
 MODEL_PARAMS = {
     "RandomForest": {
-        "n_estimators": 500,
-        "max_depth": 15,
-        "min_samples_split": 5,
-        "min_samples_leaf": 2,
-        "max_features": "sqrt",
-        "class_weight": "balanced",
+        "n_estimators": 500,            # liczba drzew w lesie
+        "max_depth": 15,                # maksymalna głębokość drzewa
+        "min_samples_split": 5,         # minimalna ilość próbek potrzebnych do rozdzielenia węzła
+        "min_samples_leaf": 2,          # minimalna ilość próbek do stworzenia liścia/węzła
+        "max_features": "sqrt",         # liczba próbek niezbędna do rozważenia najlepszego podziału
+        "class_weight": "balanced",     # rozkład wag
     },
     "kNN": {
-        "n_neighbors": 5,
-        "weights": "distance",
-        "metric": "minkowski",
-        "p": 2,
+        "n_neighbors": 5,               # liczba sąsiadów
+        "weights": "distance",          # sposób doboru wag
+        "metric": "minkowski",          # sposób obliczania odległości
     },
 
     "SVM": {
