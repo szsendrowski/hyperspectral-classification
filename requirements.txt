@@ -1,0 +1,12 @@
+numpy
+geopandas
+rasterio
+torch
+spectral
+tqdm
+scikit-learn
+joblib
+affine
+reportlab
+pysolar
+matplotlib
